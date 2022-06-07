@@ -1,0 +1,265 @@
+  #include <LiquidCrystal.h>
+  
+  #define btcima 8
+  #define btbaixo 9
+  #define btstart 10
+  
+  LiquidCrystal lcd(7,6,5,4,3,2);  
+  
+  int contraste = 1;
+  int vel= 100;
+  int pxpacman, pypacman, pxfant, pyfant, pxfruta, pyfruta;
+  bool game, vfruta;
+  int pontos;
+  int fruta;
+  int vtela;
+  
+  byte pacman[8]={0x00,0x0E,0x1B,0x1F,0x18,0x1F,0x0E,0x00};
+  byte fantasma[8]={0x00,0x0E,0x1F,0x15,0x1F,0x1F,0x15,0x00};
+  byte explosao[8]={0x11,0x15,0x0A,0x14,0x05,0x0A,0x11,0x11};
+  byte frutaDesenho[8]={0x00,0x0A,0x04,0x0E,0x17,0x1D,0x0E,0x04};
+  
+  byte morreu[5][8]={
+  {0x00,0x00,0x1B,0x1F,0x18,0x1F,0x0E,0x00},
+  {0x00,0x00,0x00,0x1F,0x18,0x1F,0x0E,0x00},
+  {0x00,0x00,0x00,0x00,0x18,0x1F,0x0E,0x00},
+  {0x00,0x00,0x00,0x00,0x00,0x1F,0x0E,0x00},
+  {0x00,0x00,0x00,0x00,0x00,0x00,0x0E,0x00}};
+  
+  void setup  (){
+      pxpacman = pypacman = pxfant = pyfant = pxfruta = pyfruta = 0;
+      pxfant = 12;
+      fruta = 0;
+      vtela = 0;
+      analogWrite(11, contraste);
+      lcd.createChar(1, pacman);
+      lcd.createChar(2, fantasma);
+      lcd.createChar(3, explosao);
+      lcd.createChar(4, frutaDesenho);
+      lcd.begin(16, 2);
+      lcd.clear();
+      game = false;
+      vfruta = false;
+  }
+  
+  void loop(){
+      //checa se o jogo ta rodando, ou se o jogador perdeu (game = 0)
+    
+      if (game)
+      {
+          lcd.clear();
+  
+          //imprime os pontos e a fruta
+          imprimePontos();
+          
+          //lê se o botão cima foi apertado
+          if(digitalRead(btcima) == 1)
+              pypacman = 0;
+          
+          //lê se o botão baixo foi apertado
+          if(digitalRead(btbaixo) == 1)
+              pypacman = 1;
+          
+          //fantama avança uma casa
+          pxfant -= 1;
+          
+          //desenha o pacman
+          desenhaPac(pxpacman, pypacman);
+        
+          //desenha o fantasma
+          desenhaFantasma(pxfant, pyfant);
+  
+          //bateu no asteroide
+          if(((pxpacman == pxfant) && (pypacman == pyfant)))
+          {
+              game = 0;
+              animacaoMorreu(pxpacman,pypacman);
+              vtela = 2;
+          }
+          //se o fantasma e o pacman estiverem na mesma coluna, mas não na mesma linha, o jogador ganha um ponto
+          else if ((pxpacman == pxfant) && (pypacman != pyfant))
+          {
+              pontos++;
+          }
+          
+          //se a fruta existir
+        desenhaFruta();
+         
+          //seta a velocidade do jogo = a velocidade que todo o código será repetida
+          delay(vel);
+      }
+      else //se o jogador perdeu/ganhou
+      {
+          tela(vtela);
+          if (digitalRead(btstart) == 1)
+          {
+              reset();
+          }
+      }
+    
+    if(pontos == 999) //está funcionando sim :)
+    {
+      game = 0;
+      vtela = 1;
+      tela(vtela);
+    }
+  }//fim do loop
+  
+  //=============================================
+  //funções
+  
+  void imprimePontos(){
+    if(pontos > 9 && pontos < 100)
+       painel(14);
+    else if(pontos > 99)
+       painel(13);
+    else
+       painel(15);
+  }
+  
+  void painel(int px) {
+    if(game != 0)
+    {
+      lcd.setCursor(px,0);
+      lcd.print(pontos);
+    lcd.setCursor(px,1);
+      lcd.print(fruta);
+    }
+  }
+  
+  void desenhaPac(int px, int py) {
+    if(game != 0){
+    lcd.setCursor (px,py);
+    lcd.write(1);
+    }
+  }
+  
+  void desenhaFantasma(int px, int py) {
+    //se o fantasma estiver fora da tela - criar um novo
+    if(pxfant < 0)
+    {
+       pxfant = 15;
+       pyfant = random(0,2);
+       if(pyfant == pyfruta && pxfant == pxfruta){
+        pyfant = !pyfant; 
+       }
+    }
+    
+    if(game != 0){
+      lcd.setCursor (px,py);
+      lcd.write(2);
+    }
+  }
+  
+  void desenhaFruta() {
+    if(game == 0)
+      return;
+    
+    //se a fruta estiver na tela
+    if(vfruta)
+    {
+      //se o pacman pegou a fruta
+      if((pxpacman == pxfruta) && (pypacman == pyfruta))
+      {
+         vfruta = false;
+         pxfruta = -1;
+         pyfruta = -1;
+         fruta++;
+         pontos++;
+      }
+      else //não pegou a fruta
+      {
+         if(pxfruta == -5)
+         {
+             vfruta = false;
+         }
+         else
+         {
+         lcd.setCursor(pxfruta, pyfruta);
+           lcd.write(4);
+             pxfruta -= 1;
+         }
+      }
+    }
+    else //se a fruta n existir
+    {
+        if(random(0,60) < 10)
+        {
+            pxfruta = 15;
+            pyfruta = random(0,2);
+            if(pyfruta == pyfant && pxfruta == pyfant)
+            {
+               vfruta = false;
+            } 
+            else
+            {
+               vfruta = true;
+            }
+        }
+    }
+  }
+  
+  void reset(){
+      pxpacman = pypacman = pxfant = pyfant = pxfruta = pyfruta = 0;
+      pontos = 0;
+      fruta = 0;
+      game = true;
+      vtela = 0;
+  }
+  
+  void tela(int cond){//0= telaInicial  1= GANHOU | 2=PERDEU
+    if(cond == 0)
+    {
+      lcd.setCursor(4,0);
+      lcd.print("PAC-MAN!");
+      lcd.setCursor(2,1);
+      lcd.print("APERTE START");
+    }
+    else if(vtela == 1)
+    {
+      lcd.setCursor(0,0);
+      lcd.print("GANHOU");
+      lcd.setCursor(7,0);
+      lcd.print("p:");
+      lcd.setCursor(9,0);
+      lcd.print(pontos);
+      lcd.setCursor(12,0);
+      lcd.write(4);
+      lcd.setCursor(13,0);
+      lcd.print(":");
+      lcd.setCursor(14,0);
+      lcd.print(fruta);
+      lcd.setCursor(0,1);
+      lcd.print("PRESSIONE START");
+    }
+    else
+    { 
+      lcd.setCursor(0,0);
+      lcd.print("PERDEU");
+      lcd.setCursor(7,0);
+      lcd.print("p:");
+      lcd.setCursor(9,0);
+      lcd.print(pontos);
+      lcd.setCursor(12,0);
+      lcd.write(4);
+      lcd.setCursor(13,0);
+      lcd.print(":");
+      lcd.setCursor(14,0);
+      lcd.print(fruta);
+      lcd.setCursor(0,1);
+      lcd.print("PRESSIONE START");
+    }
+  }
+  
+  
+  void animacaoMorreu(int x, int y){
+    for(int i = 0; i < 5; i ++){
+      lcd.createChar(1, morreu[i]);
+      lcd.clear();
+      lcd.setCursor(x, y);
+      lcd.write(1);
+      delay(500); 
+    }
+    lcd.createChar(1, pacman);
+  }
+  
